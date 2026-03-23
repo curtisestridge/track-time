@@ -22,7 +22,8 @@
 	let projectBudget = $state('');
 
 	// Task form
-	let newTaskName = $state('');
+	let newTaskNames: Record<number, string> = $state({});
+	let taskErrors: Record<number, string> = $state({});
 	let editingTaskId: number | null = $state(null);
 	let editTaskName = $state('');
 
@@ -150,13 +151,20 @@
 	// ── Task CRUD ──
 
 	async function addTask(projectId: number) {
-		if (!newTaskName.trim()) return;
+		const name = (newTaskNames[projectId] || '').trim();
+		if (!name) return;
+		taskErrors[projectId] = '';
+		const existing = getTasksForProject(projectId);
+		if (existing.some((t: Task) => t.name.toLowerCase() === name.toLowerCase())) {
+			taskErrors[projectId] = `A task named '${name}' already exists for this project`;
+			return;
+		}
 		await fetch('/api/tasks', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ project_id: projectId, name: newTaskName })
+			body: JSON.stringify({ project_id: projectId, name })
 		});
-		newTaskName = '';
+		newTaskNames[projectId] = '';
 		invalidateAll();
 	}
 
@@ -327,15 +335,21 @@
 										{/if}
 									{/each}
 									<!-- Add task inline -->
-									<div class="flex items-center gap-2 mt-1">
-										<input
-											type="text"
-											placeholder="Add task..."
-											bind:value={newTaskName}
-											onkeydown={(e) => { if (e.key === 'Enter') addTask(project.id); }}
-											class="flex-1 bg-transparent border-b border-border/50 px-1 py-1 text-sm text-text placeholder:text-text-secondary/40 focus:border-accent focus:outline-none"
-										/>
-										<button onclick={() => addTask(project.id)} disabled={!newTaskName.trim()} class="p-1 rounded text-accent hover:bg-accent/10 transition-colors disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"><Plus size={14} /></button>
+									<div class="mt-1">
+										<div class="flex items-center gap-2">
+											<input
+												type="text"
+												placeholder="Add task..."
+												bind:value={newTaskNames[project.id]}
+												oninput={() => { taskErrors[project.id] = ''; }}
+												onkeydown={(e) => { if (e.key === 'Enter') addTask(project.id); }}
+												class="flex-1 bg-transparent border-b border-border/50 px-1 py-1 text-sm text-text placeholder:text-text-secondary/40 focus:border-accent focus:outline-none"
+											/>
+											<button onclick={() => addTask(project.id)} disabled={!(newTaskNames[project.id] || '').trim()} class="p-1 rounded text-accent hover:bg-accent/10 transition-colors disabled:opacity-30 cursor-pointer disabled:cursor-not-allowed"><Plus size={14} /></button>
+										</div>
+										{#if taskErrors[project.id]}
+											<div class="text-xs text-danger mt-1 px-1">{taskErrors[project.id]}</div>
+										{/if}
 									</div>
 								</div>
 							</div>

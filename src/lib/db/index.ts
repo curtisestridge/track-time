@@ -90,10 +90,17 @@ export function getProject(id: number): Project | undefined {
 }
 
 export function createProject(clientId: number, name: string, budgetHours?: number): Project {
-	const result = getDb().prepare(
-		'INSERT INTO projects (client_id, name, budget_hours) VALUES (?, ?, ?)'
-	).run(clientId, name, budgetHours ?? null);
-	return getProject(Number(result.lastInsertRowid))!;
+	const db = getDb();
+	const createProjectTx = db.transaction(() => {
+		const result = db.prepare(
+			'INSERT INTO projects (client_id, name, budget_hours) VALUES (?, ?, ?)'
+		).run(clientId, name, budgetHours ?? null);
+		const projectId = Number(result.lastInsertRowid);
+		db.prepare('INSERT INTO tasks (project_id, name) VALUES (?, ?)').run(projectId, 'Design');
+		return projectId;
+	});
+	const projectId = createProjectTx();
+	return getProject(projectId)!;
 }
 
 export function updateProject(id: number, data: Partial<Pick<Project, 'name' | 'budget_hours' | 'archived' | 'client_id'>>): Project | undefined {
