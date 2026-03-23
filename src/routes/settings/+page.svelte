@@ -13,7 +13,7 @@
 	let city = $state(s.company_city || '');
 	let stateProvince = $state(s.company_state || '');
 	let zip = $state(s.company_zip || '');
-	let country = $state(s.company_country || '');
+	let country = $state(s.company_country || 'United States');
 	let currencySymbol = $state(s.currency_symbol || '$');
 	let currencyCode = $state(s.currency_code || 'USD');
 	let invoicePrefix = $state(s.invoice_prefix || 'INV-');
@@ -23,6 +23,8 @@
 	let invoiceNotes = $state(s.invoice_notes || '');
 
 	let showToast = $state(false);
+	let backupMessage = $state('');
+	let backupError = $state(false);
 
 	async function saveSetting(key: string, value: string) {
 		await fetch('/api/settings', {
@@ -110,18 +112,39 @@
 						<input type="text" bind:value={city} class={inputClass} />
 					</label>
 					<label class="block">
-						<span class={labelClass}>State / Province</span>
+						<span class={labelClass}>State</span>
 						<input type="text" bind:value={stateProvince} class={inputClass} />
 					</label>
 				</div>
 				<div class="grid grid-cols-2 gap-3">
 					<label class="block">
-						<span class={labelClass}>ZIP / Postal Code</span>
+						<span class={labelClass}>ZIP Code</span>
 						<input type="text" bind:value={zip} class={inputClass} />
 					</label>
 					<label class="block">
 						<span class={labelClass}>Country</span>
-						<input type="text" bind:value={country} class={inputClass} />
+						<select bind:value={country} class={inputClass}>
+							<option value="United States">United States</option>
+							<option value="Canada">Canada</option>
+							<option value="United Kingdom">United Kingdom</option>
+							<option value="Australia">Australia</option>
+							<option value="Germany">Germany</option>
+							<option value="France">France</option>
+							<option value="Japan">Japan</option>
+							<option value="India">India</option>
+							<option value="Brazil">Brazil</option>
+							<option value="Mexico">Mexico</option>
+							<option value="Netherlands">Netherlands</option>
+							<option value="Sweden">Sweden</option>
+							<option value="Switzerland">Switzerland</option>
+							<option value="New Zealand">New Zealand</option>
+							<option value="Ireland">Ireland</option>
+							<option value="Singapore">Singapore</option>
+							<option value="South Korea">South Korea</option>
+							<option value="Italy">Italy</option>
+							<option value="Spain">Spain</option>
+							<option value="Norway">Norway</option>
+						</select>
 					</label>
 				</div>
 			</div>
@@ -183,6 +206,33 @@
 		>
 			Save All Settings
 		</button>
+
+		<!-- Database Backup -->
+		<div class="bg-surface rounded-lg border border-border p-6">
+			<h3 class="text-sm font-medium text-text-secondary uppercase tracking-wider mb-4">Database Backup</h3>
+			<p class="text-sm text-text-secondary mb-4">Backups are saved to <span class="font-mono text-text">data/backups/</span> as dated copies of your database.</p>
+			<button
+				onclick={async () => {
+					backupMessage = '';
+					backupError = false;
+					const res = await fetch('/api/backup', { method: 'POST' });
+					const result = await res.json();
+					if (result.success) {
+						backupMessage = `Backup saved: ${result.path.split('/').pop()}`;
+						backupError = false;
+					} else {
+						backupMessage = result.message || 'Backup failed.';
+						backupError = true;
+					}
+				}}
+				class="flex items-center gap-2 bg-accent/15 hover:bg-accent/25 text-accent border border-accent/30 rounded-md px-4 py-2 text-sm font-medium transition-colors cursor-pointer"
+			>
+				Backup Now
+			</button>
+			{#if backupMessage}
+				<div class="mt-3 text-sm {backupError ? 'text-danger' : 'text-timer-green'}">{backupMessage}</div>
+			{/if}
+		</div>
 	</div>
 
 	{#if showToast}
