@@ -22,12 +22,24 @@ export function DELETE({ params }) {
 
 	const db = getDb();
 	const deleteClient = db.transaction((clientId: number) => {
+		// Delete invoice line items for invoices belonging to this client
+		db.prepare(`
+			DELETE FROM invoice_line_items WHERE invoice_id IN (
+				SELECT id FROM invoices WHERE client_id = ?
+			)
+		`).run(clientId);
+
+		// Delete invoices for this client
+		db.prepare('DELETE FROM invoices WHERE client_id = ?').run(clientId);
+
+		// Delete time entries for projects under this client
 		db.prepare(`
 			DELETE FROM time_entries WHERE project_id IN (
 				SELECT id FROM projects WHERE client_id = ?
 			)
 		`).run(clientId);
 
+		// Delete tasks for projects under this client
 		db.prepare(`
 			DELETE FROM tasks WHERE project_id IN (
 				SELECT id FROM projects WHERE client_id = ?

@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { goto, invalidate } from '$app/navigation';
-	import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Check, X } from 'lucide-svelte';
+	import { goto, invalidate, invalidateAll } from '$app/navigation';
+	import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Check, X, Play } from 'lucide-svelte';
 	import type { TimeEntry, Project, Task } from '$lib/types.js';
 	import { formatHours } from '$lib/utils.js';
 
@@ -12,6 +12,9 @@
 	let currentDate = $derived(data.date as string);
 	let projects = $derived(data.projects as Project[]);
 	let tasks = $derived(data.tasks as Task[]);
+
+	let timerStarting = $state(false);
+	let timerRunning = $derived(timerStarting || !!(data as any).runningTimer);
 
 	let showAddForm = $state(false);
 	let editingId: number | null = $state(null);
@@ -115,31 +118,56 @@
 		await fetch(`/api/time-entries/${id}`, { method: 'DELETE' });
 		await invalidate('app:time-entries');
 	}
+
+	async function handleResume(entry: TimeEntry) {
+		if (timerRunning) return;
+		timerStarting = true;
+		const res = await fetch('/api/timer/start', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				project_id: entry.project_id,
+				task_id: entry.task_id,
+				notes: entry.notes || ''
+			})
+		});
+		if (res.ok) {
+			await invalidateAll();
+		}
+		timerStarting = false;
+	}
 </script>
 
 <div class="p-8 max-w-5xl mx-auto">
 	<!-- Header -->
 	<div class="flex items-center justify-between mb-6">
+		<h2 class="text-2xl font-semibold">{formatDateDisplay(currentDate)}</h2>
 		<div class="flex items-center gap-4">
-			<h2 class="text-2xl font-semibold">{formatDateDisplay(currentDate)}</h2>
 			<div class="flex items-center gap-1">
 				<button onclick={() => navigateDate(-1)} class="p-1.5 rounded-md hover:bg-surface text-text-secondary hover:text-text transition-colors cursor-pointer">
 					<ChevronLeft size={18} />
 				</button>
+				<input
+					type="date"
+					value={currentDate}
+					onchange={(e) => goto(`/timesheets?date=${e.currentTarget.value}`)}
+					class="bg-surface border border-border rounded-md px-3 py-1.5 text-sm text-text"
+				/>
 				<button onclick={() => navigateDate(1)} class="p-1.5 rounded-md hover:bg-surface text-text-secondary hover:text-text transition-colors cursor-pointer">
 					<ChevronRight size={18} />
 				</button>
 			</div>
-			<input
-				type="date"
-				value={currentDate}
-				onchange={(e) => goto(`/timesheets?date=${e.currentTarget.value}`)}
-				class="bg-surface border border-border rounded-md px-3 py-1.5 text-sm text-text"
-			/>
-		</div>
-		<div class="text-right">
-			<div class="text-sm text-text-secondary">Daily Total</div>
-			<div class="text-2xl font-mono font-semibold text-accent">{formatHours(dailyTotal)}</div>
+			<button
+				onclick={() => goto(`/timesheets?date=${new Date().toISOString().split('T')[0]}`)}
+				disabled={currentDate === new Date().toISOString().split('T')[0]}
+				class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 text-accent hover:bg-surface"
+			>
+				Today
+			</button>
+			<div class="text-right">
+				<div class="text-sm text-text-secondary">Daily Total</div>
+				<div class="text-2xl font-mono font-semibold text-accent">{formatHours(dailyTotal)}</div>
+			</div>
 		</div>
 	</div>
 
@@ -226,6 +254,12 @@
 							</td>
 							<td class="px-4 py-3 text-right">
 								<div class="flex items-center justify-end gap-1">
+									<button
+										onclick={() => handleResume(entry)}
+										disabled={timerRunning}
+										title="Resume timer"
+										class="p-1.5 rounded transition-colors cursor-pointer disabled:cursor-not-allowed {timerRunning ? 'text-text-secondary/30' : 'text-[#22c55e] hover:bg-[#22c55e]/10'}"
+									><Play size={14} /></button>
 									<button onclick={() => startEdit(entry)} class="p-1.5 rounded text-text-secondary hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"><Pencil size={14} /></button>
 									<button onclick={() => handleDelete(entry.id)} class="p-1.5 rounded text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"><Trash2 size={14} /></button>
 								</div>

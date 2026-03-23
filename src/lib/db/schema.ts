@@ -49,7 +49,7 @@ export function initializeSchema(db: Database.Database): void {
 		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_city', '');
 		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_state', '');
 		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_zip', '');
-		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_country', '');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_country', 'United States');
 		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_email', '');
 		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_phone', '');
 		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_website', '');
