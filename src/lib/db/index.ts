@@ -2,7 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { initializeSchema, seedData } from './schema.js';
-import type { Client, Project, Task, TimeEntry } from '../types.js';
+import type { Client, Project, Task, TimeEntry, Invoice, InvoiceLineItem } from '../types.js';
 
 const DB_PATH = path.resolve('data', 'timetracker.db');
 
@@ -33,17 +33,18 @@ export function getClient(id: number): Client | undefined {
 	return getDb().prepare('SELECT * FROM clients WHERE id = ?').get(id) as Client | undefined;
 }
 
-export function createClient(name: string, color: string): Client {
-	const result = getDb().prepare('INSERT INTO clients (name, color) VALUES (?, ?)').run(name, color);
+export function createClient(name: string, color: string, hourlyRate = 0): Client {
+	const result = getDb().prepare('INSERT INTO clients (name, color, hourly_rate) VALUES (?, ?, ?)').run(name, color, hourlyRate);
 	return getClient(Number(result.lastInsertRowid))!;
 }
 
-export function updateClient(id: number, data: Partial<Pick<Client, 'name' | 'color' | 'archived'>>): Client | undefined {
+export function updateClient(id: number, data: Partial<Pick<Client, 'name' | 'color' | 'archived' | 'hourly_rate'>>): Client | undefined {
 	const fields: string[] = [];
 	const values: unknown[] = [];
 	if (data.name !== undefined) { fields.push('name = ?'); values.push(data.name); }
 	if (data.color !== undefined) { fields.push('color = ?'); values.push(data.color); }
 	if (data.archived !== undefined) { fields.push('archived = ?'); values.push(data.archived); }
+	if (data.hourly_rate !== undefined) { fields.push('hourly_rate = ?'); values.push(data.hourly_rate); }
 	if (fields.length === 0) return getClient(id);
 	values.push(id);
 	getDb().prepare(`UPDATE clients SET ${fields.join(', ')} WHERE id = ?`).run(...values);
@@ -146,16 +147,19 @@ export function getTimeEntriesByDate(date: string): TimeEntry[] {
 	`).all(date) as TimeEntry[];
 }
 
-export function getTimeEntriesByDateRange(start: string, end: string): TimeEntry[] {
+export function getTimeEntriesByDateRange(start: string, end: string, clientId?: number): TimeEntry[] {
+	const clientFilter = clientId ? 'AND c.id = ?' : '';
+	const params: unknown[] = [start, end];
+	if (clientId) params.push(clientId);
 	return getDb().prepare(`
 		SELECT te.*, p.name as project_name, c.name as client_name, c.color as client_color, t.name as task_name
 		FROM time_entries te
 		LEFT JOIN projects p ON te.project_id = p.id
 		LEFT JOIN clients c ON p.client_id = c.id
 		LEFT JOIN tasks t ON te.task_id = t.id
-		WHERE te.date >= ? AND te.date <= ?
+		WHERE te.date >= ? AND te.date <= ? ${clientFilter}
 		ORDER BY te.date DESC, te.created_at DESC
-	`).all(start, end) as TimeEntry[];
+	`).all(...params) as TimeEntry[];
 }
 
 export function getTimeEntry(id: number): TimeEntry | undefined {
@@ -267,6 +271,75 @@ export function getAllSettings(): Record<string, string> {
 	const result: Record<string, string> = {};
 	for (const row of rows) result[row.key] = row.value;
 	return result;
+}
+
+// ── Invoices ──
+
+export function getAllInvoices(): (Invoice & { total: number })[] {
+	return getDb().prepare(`
+		SELECT i.*, c.name as client_name,
+			COALESCE(SUM(li.amount), 0) as total
+		FROM invoices i
+		LEFT JOIN clients c ON i.client_id = c.id
+		LEFT JOIN invoice_line_items li ON li.invoice_id = i.id
+		GROUP BY i.id
+		ORDER BY i.created_at DESC
+	`).all() as (Invoice & { total: number })[];
+}
+
+export function getInvoice(id: number): Invoice | undefined {
+	return getDb().prepare(`
+		SELECT i.*, c.name as client_name
+		FROM invoices i
+		LEFT JOIN clients c ON i.client_id = c.id
+		WHERE i.id = ?
+	`).get(id) as Invoice | undefined;
+}
+
+export function getInvoiceLineItems(invoiceId: number): InvoiceLineItem[] {
+	return getDb().prepare('SELECT * FROM invoice_line_items WHERE invoice_id = ? ORDER BY id').all(invoiceId) as InvoiceLineItem[];
+}
+
+export function createInvoice(data: {
+	invoice_number: string;
+	client_id: number;
+	issue_date: string;
+	due_date: string;
+	notes?: string;
+	payment_instructions?: string;
+	line_items: { description: string; hours: number; rate: number; amount: number }[];
+}): Invoice {
+	const db = getDb();
+	const result = db.transaction(() => {
+		const res = db.prepare(`
+			INSERT INTO invoices (invoice_number, client_id, issue_date, due_date, notes, payment_instructions)
+			VALUES (?, ?, ?, ?, ?, ?)
+		`).run(data.invoice_number, data.client_id, data.issue_date, data.due_date, data.notes ?? null, data.payment_instructions ?? null);
+
+		const invoiceId = Number(res.lastInsertRowid);
+		const insertItem = db.prepare(
+			'INSERT INTO invoice_line_items (invoice_id, description, hours, rate, amount) VALUES (?, ?, ?, ?, ?)'
+		);
+		for (const item of data.line_items) {
+			insertItem.run(invoiceId, item.description, item.hours, item.rate, item.amount);
+		}
+		return invoiceId;
+	})();
+
+	return getInvoice(result)!;
+}
+
+export function updateInvoiceStatus(id: number, status: string): Invoice | undefined {
+	getDb().prepare("UPDATE invoices SET status = ?, updated_at = datetime('now') WHERE id = ?").run(status, id);
+	return getInvoice(id);
+}
+
+export function deleteInvoice(id: number): void {
+	const db = getDb();
+	db.transaction(() => {
+		db.prepare('DELETE FROM invoice_line_items WHERE invoice_id = ?').run(id);
+		db.prepare('DELETE FROM invoices WHERE id = ?').run(id);
+	})();
 }
 
 // ── Weekly Summary ──

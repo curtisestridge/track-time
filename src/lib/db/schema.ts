@@ -44,7 +44,51 @@ export function initializeSchema(db: Database.Database): void {
 		);
 
 		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_name', 'My Company');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_address_line1', '');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_address_line2', '');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_city', '');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_state', '');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_zip', '');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_country', '');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_email', '');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_phone', '');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('company_website', '');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('currency_symbol', '$');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('currency_code', 'USD');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('invoice_prefix', 'INV-');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('invoice_next_number', '1');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('payment_terms', 'Net 30');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('payment_instructions', '');
+		INSERT OR IGNORE INTO settings (key, value) VALUES ('invoice_notes', '');
+
+		CREATE TABLE IF NOT EXISTS invoices (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			invoice_number TEXT NOT NULL UNIQUE,
+			client_id INTEGER REFERENCES clients(id),
+			status TEXT DEFAULT 'draft',
+			issue_date TEXT NOT NULL,
+			due_date TEXT NOT NULL,
+			notes TEXT,
+			payment_instructions TEXT,
+			created_at TEXT DEFAULT (datetime('now')),
+			updated_at TEXT DEFAULT (datetime('now'))
+		);
+
+		CREATE TABLE IF NOT EXISTS invoice_line_items (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			invoice_id INTEGER REFERENCES invoices(id),
+			description TEXT NOT NULL,
+			hours REAL NOT NULL,
+			rate REAL NOT NULL,
+			amount REAL NOT NULL
+		);
 	`);
+
+	// Add hourly_rate to clients if not exists
+	const cols = db.prepare("PRAGMA table_info(clients)").all() as { name: string }[];
+	if (!cols.find(c => c.name === 'hourly_rate')) {
+		db.exec("ALTER TABLE clients ADD COLUMN hourly_rate REAL DEFAULT 0");
+	}
 }
 
 export function seedData(db: Database.Database): void {

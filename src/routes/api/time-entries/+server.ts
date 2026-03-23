@@ -10,7 +10,8 @@ export function GET({ url }) {
 		return json(getTimeEntriesByDate(date));
 	}
 	if (start && end) {
-		return json(getTimeEntriesByDateRange(start, end));
+		const clientId = url.searchParams.get('client_id');
+		return json(getTimeEntriesByDateRange(start, end, clientId ? Number(clientId) : undefined));
 	}
 	return json({ error: 'date or start+end params required' }, { status: 400 });
 }

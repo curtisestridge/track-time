@@ -12,6 +12,7 @@
 	let editingClientId: number | null = $state(null);
 	let clientName = $state('');
 	let clientColor = $state('#6366f1');
+	let clientHourlyRate = $state('0');
 	let confirmDeleteClientId: number | null = $state(null);
 
 	// Project form
@@ -47,6 +48,7 @@
 		editingClientId = null;
 		clientName = '';
 		clientColor = '#6366f1';
+		clientHourlyRate = '0';
 	}
 
 	function startEditClient(client: Client) {
@@ -54,6 +56,7 @@
 		editingClientId = client.id;
 		clientName = client.name;
 		clientColor = client.color;
+		clientHourlyRate = String(client.hourly_rate || 0);
 	}
 
 	async function saveClient() {
@@ -62,13 +65,13 @@
 			await fetch(`/api/clients/${editingClientId}`, {
 				method: 'PUT',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name: clientName, color: clientColor })
+				body: JSON.stringify({ name: clientName, color: clientColor, hourly_rate: parseFloat(clientHourlyRate) || 0 })
 			});
 		} else {
 			const res = await fetch('/api/clients', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ name: clientName, color: clientColor })
+				body: JSON.stringify({ name: clientName, color: clientColor, hourly_rate: parseFloat(clientHourlyRate) || 0 })
 			});
 			const newClient = await res.json();
 			selectedClientId = newClient.id;
@@ -202,6 +205,11 @@
 				{#if showClientForm}
 					<div class="p-3 border-b border-border bg-bg/50">
 						<input type="text" placeholder="Client name" bind:value={clientName} class="w-full bg-bg border border-border rounded px-2 py-1.5 text-sm text-text mb-2 placeholder:text-text-secondary/50" />
+						<div class="flex items-center gap-2 mb-2">
+							<span class="text-xs text-text-secondary shrink-0">Rate</span>
+							<input type="number" step="0.01" min="0" placeholder="0.00" bind:value={clientHourlyRate} class="w-24 bg-bg border border-border rounded px-2 py-1.5 text-sm text-text font-mono text-right" />
+							<span class="text-xs text-text-secondary">/hr</span>
+						</div>
 						<div class="flex items-center gap-2">
 							<input type="color" bind:value={clientColor} class="w-8 h-8 rounded border border-border cursor-pointer" />
 							<span class="text-xs text-text-secondary flex-1">{clientColor}</span>

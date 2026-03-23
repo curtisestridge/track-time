@@ -6,8 +6,8 @@ export function GET() {
 }
 
 export async function POST({ request }) {
-	const { name, color } = await request.json();
+	const { name, color, hourly_rate } = await request.json();
 	if (!name) return json({ error: 'Name is required' }, { status: 400 });
-	const client = createClient(name, color || '#6366f1');
+	const client = createClient(name, color || '#6366f1', hourly_rate || 0);
 	return json(client, { status: 201 });
 }

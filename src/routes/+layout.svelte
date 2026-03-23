@@ -2,7 +2,7 @@
 	import '../app.css';
 	import { page } from '$app/stores';
 	import { invalidate } from '$app/navigation';
-	import { Clock, Calendar, FolderOpen, BarChart3, Square, Play, Settings } from 'lucide-svelte';
+	import { Clock, Calendar, FolderOpen, FileText, BarChart3, Square, Play, Settings } from 'lucide-svelte';
 	import { onMount, onDestroy } from 'svelte';
 	import type { TimeEntry, Project, Task } from '$lib/types.js';
 
@@ -120,6 +120,7 @@
 	const navItems = [
 		{ href: '/timesheets', label: 'Timesheets', icon: Calendar },
 		{ href: '/projects', label: 'Projects', icon: FolderOpen },
+		{ href: '/invoices', label: 'Invoices', icon: FileText },
 		{ href: '/reports', label: 'Reports', icon: BarChart3 }
 	];
 </script>

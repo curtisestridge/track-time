@@ -26,6 +26,14 @@ SQLite database lives at `data/timetracker.db` (gitignored).
 
 To back up your data, copy this file. To reset, delete it — a fresh DB with seed data will be created on next launch.
 
+**Before switching branches or pulling schema changes**, back up your database:
+
+```bash
+cp data/timetracker.db data/timetracker.db.bak
+```
+
+The DB is not tracked by git, so branch switches that add new tables or columns will require a fresh DB. Having a backup lets you reference or migrate your old data.
+
 ## Tech Stack
 
 - SvelteKit + TypeScript
