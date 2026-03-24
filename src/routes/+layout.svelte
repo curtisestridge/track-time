@@ -49,6 +49,14 @@
 	});
 
 	$effect(() => {
+		if (runningTimer) {
+			document.title = `${elapsed.slice(0, 5)} — Track Time`;
+		} else {
+			document.title = 'Track Time';
+		}
+	});
+
+	$effect(() => {
 		if (showTimerForm) {
 			loadLastTimer();
 		}
