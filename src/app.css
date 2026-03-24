@@ -1,19 +1,47 @@
 @import 'tailwindcss';
 
 @theme {
-  --color-bg: #0f1117;
-  --color-surface: #1a1d27;
-  --color-border: #2a2d3a;
-  --color-accent: #6366f1;
-  --color-accent-hover: #818cf8;
-  --color-text: #e2e8f0;
-  --color-text-secondary: #94a3b8;
-  --color-timer-green: #22c55e;
-  --color-danger: #ef4444;
-  --color-danger-hover: #dc2626;
+  --color-bg: var(--theme-bg);
+  --color-surface: var(--theme-surface);
+  --color-border: var(--theme-border);
+  --color-accent: var(--theme-accent);
+  --color-accent-hover: var(--theme-accent-hover);
+  --color-text: var(--theme-text);
+  --color-text-secondary: var(--theme-text-secondary);
+  --color-timer-green: var(--theme-timer-green);
+  --color-danger: var(--theme-danger);
+  --color-danger-hover: var(--theme-danger-hover);
 
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
   --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Dark theme (default) */
+:root {
+  --theme-bg: #0f1117;
+  --theme-surface: #1a1d27;
+  --theme-border: #2a2d3a;
+  --theme-accent: #6366f1;
+  --theme-accent-hover: #818cf8;
+  --theme-text: #e2e8f0;
+  --theme-text-secondary: #94a3b8;
+  --theme-timer-green: #22c55e;
+  --theme-danger: #ef4444;
+  --theme-danger-hover: #dc2626;
+}
+
+/* Light theme */
+[data-theme="light"] {
+  --theme-bg: #f8f9fb;
+  --theme-surface: #ffffff;
+  --theme-border: #e2e5eb;
+  --theme-accent: #6366f1;
+  --theme-accent-hover: #4f46e5;
+  --theme-text: #1e293b;
+  --theme-text-secondary: #64748b;
+  --theme-timer-green: #16a34a;
+  --theme-danger: #dc2626;
+  --theme-danger-hover: #b91c1c;
 }
 
 html, body {
@@ -24,6 +52,12 @@ html, body {
 
 input, select, textarea {
   color-scheme: dark;
+}
+
+[data-theme="light"] input,
+[data-theme="light"] select,
+[data-theme="light"] textarea {
+  color-scheme: light;
 }
 
 /* Timer pulse animation */

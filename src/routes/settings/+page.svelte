@@ -1,8 +1,21 @@
 <script lang="ts">
-	import { Check } from 'lucide-svelte';
+	import { Check, Sun, Moon } from 'lucide-svelte';
+	import { onMount } from 'svelte';
 
 	let { data } = $props();
 	const s = data.settings;
+
+	let darkMode = $state(true);
+
+	onMount(() => {
+		darkMode = document.documentElement.getAttribute('data-theme') !== 'light';
+	});
+
+	function setTheme(dark: boolean) {
+		darkMode = dark;
+		document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+		localStorage.setItem('theme', dark ? 'dark' : 'light');
+	}
 
 	let companyName = $state(s.company_name || '');
 	let companyEmail = $state(s.company_email || '');
@@ -69,6 +82,27 @@
 	<h2 class="text-2xl font-semibold mb-6">Settings</h2>
 
 	<div class="space-y-6">
+		<!-- Theme -->
+		<div class="bg-surface rounded-lg border border-border p-6">
+			<h3 class="text-sm font-medium text-text-secondary uppercase tracking-wider mb-4">Theme</h3>
+			<div class="flex gap-3">
+				<button
+					onclick={() => setTheme(true)}
+					class="flex-1 flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors cursor-pointer {darkMode ? 'border-accent bg-accent/10 text-accent' : 'border-border text-text-secondary hover:border-border hover:text-text'}"
+				>
+					<Moon size={18} />
+					<span class="text-sm font-medium">Dark</span>
+				</button>
+				<button
+					onclick={() => setTheme(false)}
+					class="flex-1 flex items-center gap-3 px-4 py-3 rounded-lg border transition-colors cursor-pointer {!darkMode ? 'border-accent bg-accent/10 text-accent' : 'border-border text-text-secondary hover:border-border hover:text-text'}"
+				>
+					<Sun size={18} />
+					<span class="text-sm font-medium">Light</span>
+				</button>
+			</div>
+		</div>
+
 		<!-- Business Information -->
 		<div class="bg-surface rounded-lg border border-border p-6">
 			<h3 class="text-sm font-medium text-text-secondary uppercase tracking-wider mb-4">Business Information</h3>
