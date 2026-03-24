@@ -50,9 +50,9 @@
 
 	$effect(() => {
 		if (runningTimer) {
-			document.title = `${elapsed.slice(0, 5)} — Track Time`;
+			document.title = `${elapsed.slice(0, 5)} — PunchCard`;
 		} else {
-			document.title = 'Track Time';
+			document.title = 'PunchCard';
 		}
 	});
 
@@ -147,7 +147,7 @@
 		<div class="p-5 border-b border-border">
 			<h1 class="text-lg font-semibold text-text flex items-center gap-2">
 				<Clock size={20} class="text-accent" />
-				Track Time
+				PunchCard
 			</h1>
 			<div class="text-xs text-text-secondary mt-1">{data.companyName}</div>
 		</div>
