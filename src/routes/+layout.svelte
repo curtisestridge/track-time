@@ -24,8 +24,7 @@
 	let timerProjectId = $state('');
 	let timerTaskId = $state('');
 	let timerNotes = $state('');
-	let offsetHH = $state('00');
-	let offsetMM = $state('00');
+	let timerOffset = $state('0:00');
 	let availableTasks: Task[] = $state([]);
 
 	let projects = $derived(data.projects as Project[]);
@@ -83,9 +82,17 @@
 		}
 	}
 
+	function parseOffsetSeconds(hmm: string): number {
+		const match = hmm.trim().match(/^(\d+):(\d{1,2})$/);
+		if (match) {
+			return (parseInt(match[1]) * 3600) + (parseInt(match[2]) * 60);
+		}
+		return 0;
+	}
+
 	async function handleStartTimer() {
 		if (!timerProjectId || !timerTaskId) return;
-		const offsetSeconds = (parseInt(offsetHH) || 0) * 3600 + (parseInt(offsetMM) || 0) * 60;
+		const offsetSeconds = parseOffsetSeconds(timerOffset);
 		const res = await fetch('/api/timer/start', {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
@@ -102,8 +109,7 @@
 			timerProjectId = '';
 			timerTaskId = '';
 			timerNotes = '';
-			offsetHH = '00';
-			offsetMM = '00';
+			timerOffset = '0:00';
 			updateElapsed();
 		}
 	}
@@ -121,7 +127,8 @@
 		{ href: '/timesheets', label: 'Timesheets', icon: Calendar },
 		{ href: '/projects', label: 'Projects', icon: FolderOpen },
 		{ href: '/invoices', label: 'Invoices', icon: FileText },
-		{ href: '/reports', label: 'Reports', icon: BarChart3 }
+		{ href: '/reports', label: 'Reports', icon: BarChart3 },
+		{ href: '/settings', label: 'Settings', icon: Settings }
 	];
 </script>
 
@@ -152,17 +159,6 @@
 						{item.label}
 					</a>
 				{/each}
-			</div>
-			<div class="border-t border-border pt-2 mt-2">
-				<a
-					href="/settings"
-					class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors {$page.url.pathname.startsWith('/settings')
-						? 'bg-accent/15 text-accent font-medium'
-						: 'text-text-secondary hover:bg-border/30 hover:text-text'}"
-				>
-					<Settings size={18} />
-					Settings
-				</a>
 			</div>
 		</nav>
 
@@ -219,25 +215,12 @@
 						/>
 						<div>
 							<div class="text-xs text-text-secondary mb-1">Time already worked</div>
-							<div class="flex items-center gap-1">
-								<input
-									type="number"
-									min="0"
-									max="23"
-									placeholder="00"
-									bind:value={offsetHH}
-									class="w-14 bg-surface border border-border rounded-md px-2 py-1.5 text-xs text-text text-center font-mono"
-								/>
-								<span class="text-xs text-text-secondary font-mono">:</span>
-								<input
-									type="number"
-									min="0"
-									max="59"
-									placeholder="00"
-									bind:value={offsetMM}
-									class="w-14 bg-surface border border-border rounded-md px-2 py-1.5 text-xs text-text text-center font-mono"
-								/>
-							</div>
+							<input
+								type="text"
+								placeholder="0:00"
+								bind:value={timerOffset}
+								class="w-full bg-surface border border-border rounded-md px-2 py-1.5 text-xs text-text font-mono"
+							/>
 						</div>
 						<div class="flex gap-2">
 							<button

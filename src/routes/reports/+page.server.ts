@@ -1,4 +1,5 @@
 import { getTimeEntriesByDateRange } from '$lib/db/index.js';
+import { localDate } from '$lib/utils.js';
 
 export function load({ url }) {
 	const preset = url.searchParams.get('preset') || 'this-week';
@@ -6,7 +7,7 @@ export function load({ url }) {
 	let end = url.searchParams.get('end') || '';
 
 	const today = new Date();
-	const todayStr = today.toISOString().split('T')[0];
+	const todayStr = localDate(today);
 
 	if (preset !== 'custom' || !start || !end) {
 		const day = today.getDay();
@@ -16,16 +17,16 @@ export function load({ url }) {
 			monday.setDate(today.getDate() + mondayOffset);
 			const sunday = new Date(monday);
 			sunday.setDate(monday.getDate() + 6);
-			start = monday.toISOString().split('T')[0];
-			end = sunday.toISOString().split('T')[0];
+			start = localDate(monday);
+			end = localDate(sunday);
 		} else if (preset === 'this-month') {
 			start = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-01`;
 			end = todayStr;
 		} else if (preset === 'last-month') {
 			const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
 			const lastDay = new Date(today.getFullYear(), today.getMonth(), 0);
-			start = lastMonth.toISOString().split('T')[0];
-			end = lastDay.toISOString().split('T')[0];
+			start = localDate(lastMonth);
+			end = localDate(lastDay);
 		}
 	}
 

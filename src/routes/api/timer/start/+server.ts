@@ -2,10 +2,10 @@ import { json } from '@sveltejs/kit';
 import { startTimer } from '$lib/db/index.js';
 
 export async function POST({ request }) {
-	const { project_id, task_id, notes, offset_seconds } = await request.json();
+	const { project_id, task_id, notes, offset_seconds, resume_entry_id } = await request.json();
 	if (!project_id || !task_id) {
 		return json({ error: 'project_id and task_id are required' }, { status: 400 });
 	}
-	const entry = startTimer(project_id, task_id, notes, offset_seconds || 0);
+	const entry = startTimer(project_id, task_id, notes, offset_seconds || 0, resume_entry_id);
 	return json(entry, { status: 201 });
 }

@@ -2,6 +2,7 @@ import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
 import { initializeSchema, seedData } from './schema.js';
+import { localDate } from '../utils.js';
 import type { Client, Project, Task, TimeEntry, Invoice, InvoiceLineItem } from '../types.js';
 
 const DB_PATH = path.resolve('data', 'timetracker.db');
@@ -149,7 +150,7 @@ export function getTimeEntriesByDate(date: string): TimeEntry[] {
 		LEFT JOIN projects p ON te.project_id = p.id
 		LEFT JOIN clients c ON p.client_id = c.id
 		LEFT JOIN tasks t ON te.task_id = t.id
-		WHERE te.date = ?
+		WHERE te.date = ? AND te.resume_entry_id IS NULL
 		ORDER BY te.created_at DESC
 	`).all(date) as TimeEntry[];
 }
@@ -227,7 +228,7 @@ export function getRunningTimer(): TimeEntry | undefined {
 	`).get() as TimeEntry | undefined;
 }
 
-export function startTimer(projectId: number, taskId: number, notes?: string, offsetSeconds = 0): TimeEntry {
+export function startTimer(projectId: number, taskId: number, notes?: string, offsetSeconds = 0, resumeEntryId?: number): TimeEntry {
 	// Stop any existing timer first
 	const running = getRunningTimer();
 	if (running) {
@@ -235,8 +236,8 @@ export function startTimer(projectId: number, taskId: number, notes?: string, of
 	}
 
 	const adjustedStart = new Date(Date.now() - offsetSeconds * 1000).toISOString();
-	const today = new Date().toISOString().split('T')[0];
-	return createTimeEntry({
+	const today = localDate();
+	const entry = createTimeEntry({
 		project_id: projectId,
 		task_id: taskId,
 		date: today,
@@ -244,17 +245,35 @@ export function startTimer(projectId: number, taskId: number, notes?: string, of
 		notes: notes || '',
 		timer_started_at: adjustedStart
 	});
+
+	if (resumeEntryId) {
+		getDb().prepare('UPDATE time_entries SET resume_entry_id = ? WHERE id = ?').run(resumeEntryId, entry.id);
+		return getTimeEntry(entry.id)!;
+	}
+
+	return entry;
 }
 
 export function stopTimer(id: number): TimeEntry | undefined {
-	const entry = getTimeEntry(id);
+	const db = getDb();
+	const entry = db.prepare('SELECT * FROM time_entries WHERE id = ?').get(id) as TimeEntry | undefined;
 	if (!entry || !entry.timer_started_at) return entry;
 
 	const started = new Date(entry.timer_started_at).getTime();
 	const now = Date.now();
 	const hours = Math.round(((now - started) / 3600000) * 100) / 100;
 
-	getDb().prepare(`
+	if ((entry as any).resume_entry_id) {
+		// Add elapsed time to the original entry, then delete the temp timer entry
+		db.prepare(`
+			UPDATE time_entries SET hours = COALESCE(hours, 0) + ?, updated_at = datetime('now')
+			WHERE id = ?
+		`).run(hours, (entry as any).resume_entry_id);
+		db.prepare('DELETE FROM time_entries WHERE id = ?').run(id);
+		return getTimeEntry((entry as any).resume_entry_id);
+	}
+
+	db.prepare(`
 		UPDATE time_entries SET hours = ?, timer_started_at = NULL, updated_at = datetime('now')
 		WHERE id = ?
 	`).run(hours, id);

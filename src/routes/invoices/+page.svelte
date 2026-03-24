@@ -3,6 +3,7 @@
 	import { Plus, Download, Trash2, Send, CheckCircle, X, ArrowLeft } from 'lucide-svelte';
 	import type { Client, TimeEntry, Invoice, InvoiceLineItem } from '$lib/types.js';
 	import { generateInvoicePDF } from '$lib/invoice-pdf.js';
+	import { localDate } from '$lib/utils.js';
 
 	let { data } = $props();
 
@@ -14,7 +15,7 @@
 	// Create invoice state
 	let showCreate = $state(false);
 	let selectedClientId = $state('');
-	let issueDate = $state(new Date().toISOString().split('T')[0]);
+	let issueDate = $state(localDate());
 	let dueDate = $state('');
 	let paymentInstructions = $state('');
 	let invoiceNotes = $state('');
@@ -31,7 +32,7 @@
 	function startCreate() {
 		showCreate = true;
 		selectedClientId = '';
-		issueDate = new Date().toISOString().split('T')[0];
+		issueDate = localDate();
 		paymentInstructions = settings.payment_instructions || '';
 		invoiceNotes = settings.invoice_notes || '';
 		lineItems = [];
@@ -51,7 +52,7 @@
 		else if (terms === 'Net 45') days = 45;
 		else if (terms === 'Net 60') days = 60;
 		d.setDate(d.getDate() + days);
-		dueDate = d.toISOString().split('T')[0];
+		dueDate = localDate(d);
 	}
 
 	async function loadTimeEntries() {

@@ -1,4 +1,5 @@
 import type Database from 'better-sqlite3';
+import { localDate } from '../utils.js';
 
 export function initializeSchema(db: Database.Database): void {
 	db.exec(`
@@ -89,6 +90,12 @@ export function initializeSchema(db: Database.Database): void {
 	if (!cols.find(c => c.name === 'hourly_rate')) {
 		db.exec("ALTER TABLE clients ADD COLUMN hourly_rate REAL DEFAULT 0");
 	}
+
+	// Add resume_entry_id to time_entries if not exists
+	const teCols = db.prepare("PRAGMA table_info(time_entries)").all() as { name: string }[];
+	if (!teCols.find(c => c.name === 'resume_entry_id')) {
+		db.exec("ALTER TABLE time_entries ADD COLUMN resume_entry_id INTEGER REFERENCES time_entries(id)");
+	}
 }
 
 export function seedData(db: Database.Database): void {
@@ -118,8 +125,8 @@ export function seedData(db: Database.Database): void {
 	insertTask.run(proj3.lastInsertRowid, 'Presentation');
 
 	// Seed a few time entries for today and recent days
-	const today = new Date().toISOString().split('T')[0];
-	const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+	const today = localDate();
+	const yesterday = localDate(new Date(Date.now() - 86400000));
 
 	const insertEntry = db.prepare(
 		'INSERT INTO time_entries (project_id, task_id, date, hours, notes) VALUES (?, ?, ?, ?, ?)'

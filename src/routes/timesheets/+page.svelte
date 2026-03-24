@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { goto, invalidate, invalidateAll } from '$app/navigation';
-	import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Check, X, Play } from 'lucide-svelte';
+	import { onMount, onDestroy } from 'svelte';
+	import { ChevronLeft, ChevronRight, Plus, Pencil, Trash2, Check, X, Play, Square } from 'lucide-svelte';
 	import type { TimeEntry, Project, Task } from '$lib/types.js';
-	import { formatHours } from '$lib/utils.js';
+	import { formatHours, localDate } from '$lib/utils.js';
 
 	let { data } = $props();
 
@@ -14,7 +15,52 @@
 	let tasks = $derived(data.tasks as Task[]);
 
 	let timerStarting = $state(false);
-	let timerRunning = $derived(timerStarting || !!(data as any).runningTimer);
+	let runningTimer = $derived((data as any).runningTimer as any);
+	let timerRunning = $derived(timerStarting || !!runningTimer);
+	let resumeEntryId = $derived(runningTimer?.resume_entry_id as number | null);
+	let timerStartedAt = $derived(runningTimer?.timer_started_at as string | null);
+
+	// Live elapsed time tracking for resumed entries
+	let timerElapsedHours = $state(0);
+	let timerInterval: ReturnType<typeof setInterval> | null = null;
+
+	function updateTimerElapsed() {
+		if (timerStartedAt) {
+			const started = new Date(timerStartedAt).getTime();
+			timerElapsedHours = (Date.now() - started) / 3600000;
+		} else {
+			timerElapsedHours = 0;
+		}
+	}
+
+	function decimalToHMM(decimal: number): string {
+		const totalMinutes = Math.round(decimal * 60);
+		const h = Math.floor(totalMinutes / 60);
+		const m = totalMinutes % 60;
+		return `${h}:${String(m).padStart(2, '0')}`;
+	}
+
+	function hmmToDecimal(hmm: string): number | null {
+		const match = hmm.trim().match(/^(\d+):(\d{1,2})$/);
+		if (match) {
+			const h = parseInt(match[1]);
+			const m = parseInt(match[2]);
+			if (m > 59) return null;
+			return h + m / 60;
+		}
+		const num = parseFloat(hmm);
+		if (!isNaN(num) && num > 0) return num;
+		return null;
+	}
+
+	onMount(() => {
+		updateTimerElapsed();
+		timerInterval = setInterval(updateTimerElapsed, 1000);
+	});
+
+	onDestroy(() => {
+		if (timerInterval) clearInterval(timerInterval);
+	});
 
 	let showAddForm = $state(false);
 	let editingId: number | null = $state(null);
@@ -36,13 +82,13 @@
 	function navigateDate(offset: number) {
 		const d = new Date(currentDate + 'T12:00:00');
 		d.setDate(d.getDate() + offset);
-		goto(`/timesheets?date=${d.toISOString().split('T')[0]}`);
+		goto(`/timesheets?date=${localDate(d)}`);
 	}
 
 	function formatDateDisplay(dateStr: string): string {
 		const d = new Date(dateStr + 'T12:00:00');
-		const today = new Date().toISOString().split('T')[0];
-		const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0];
+		const today = localDate();
+		const yesterday = localDate(new Date(Date.now() - 86400000));
 		if (dateStr === today) return 'Today';
 		if (dateStr === yesterday) return 'Yesterday';
 		return d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
@@ -62,8 +108,8 @@
 
 	async function handleAdd() {
 		if (!addProjectId || !addTaskId || !addHours) return;
-		const hours = parseFloat(addHours);
-		if (isNaN(hours) || hours <= 0 || hours > 24) return;
+		const hours = hmmToDecimal(addHours);
+		if (!hours || hours <= 0 || hours > 24) return;
 
 		await fetch('/api/time-entries', {
 			method: 'POST',
@@ -89,15 +135,15 @@
 		editingId = entry.id;
 		editProjectId = String(entry.project_id);
 		editTaskId = String(entry.task_id);
-		editHours = String(entry.hours || '');
+		editHours = entry.hours ? decimalToHMM(entry.hours) : '';
 		editNotes = entry.notes || '';
 		editAvailableTasks = tasks.filter((t: Task) => t.project_id === entry.project_id);
 	}
 
 	async function handleEdit() {
 		if (!editingId || !editProjectId || !editTaskId || !editHours) return;
-		const hours = parseFloat(editHours);
-		if (isNaN(hours) || hours <= 0 || hours > 24) return;
+		const hours = hmmToDecimal(editHours);
+		if (!hours || hours <= 0 || hours > 24) return;
 
 		await fetch(`/api/time-entries/${editingId}`, {
 			method: 'PUT',
@@ -128,13 +174,21 @@
 			body: JSON.stringify({
 				project_id: entry.project_id,
 				task_id: entry.task_id,
-				notes: entry.notes || ''
+				notes: entry.notes || '',
+				resume_entry_id: entry.id
 			})
 		});
 		if (res.ok) {
 			await invalidateAll();
 		}
 		timerStarting = false;
+	}
+
+	async function handleStop() {
+		const res = await fetch('/api/timer/stop', { method: 'POST' });
+		if (res.ok) {
+			await invalidateAll();
+		}
 	}
 </script>
 
@@ -158,8 +212,8 @@
 				</button>
 			</div>
 			<button
-				onclick={() => goto(`/timesheets?date=${new Date().toISOString().split('T')[0]}`)}
-				disabled={currentDate === new Date().toISOString().split('T')[0]}
+				onclick={() => goto(`/timesheets?date=${localDate()}`)}
+				disabled={currentDate === localDate()}
 				class="px-3 py-1.5 rounded-md text-sm font-medium transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 text-accent hover:bg-surface"
 			>
 				Today
@@ -223,7 +277,7 @@
 								<input type="text" bind:value={editNotes} class="w-full bg-bg border border-border rounded px-2 py-1 text-sm text-text" />
 							</td>
 							<td class="px-4 py-2">
-								<input type="number" step="0.25" min="0" max="24" bind:value={editHours} class="w-20 bg-bg border border-border rounded px-2 py-1 text-sm text-text text-right font-mono ml-auto block" />
+								<input type="text" placeholder="0:00" bind:value={editHours} class="w-20 bg-bg border border-border rounded px-2 py-1 text-sm text-text text-right font-mono ml-auto block" />
 							</td>
 							<td class="px-4 py-2 text-right">
 								<div class="flex items-center justify-end gap-1">
@@ -246,7 +300,12 @@
 							<td class="px-4 py-3 text-sm text-text-secondary">{entry.task_name}</td>
 							<td class="px-4 py-3 text-sm text-text-secondary">{entry.notes || '—'}</td>
 							<td class="px-4 py-3 text-right">
-								{#if entry.hours !== null}
+								{#if resumeEntryId === entry.id}
+									<span class="inline-flex items-center gap-1.5 font-mono text-sm font-medium text-timer-green">
+										<span class="w-2 h-2 rounded-full bg-timer-green timer-pulse"></span>
+										{formatHours((entry.hours || 0) + timerElapsedHours)}
+									</span>
+								{:else if entry.hours !== null}
 									<span class="font-mono text-sm font-medium">{formatHours(entry.hours)}</span>
 								{:else}
 									<span class="text-xs text-timer-green font-medium timer-pulse">Running...</span>
@@ -254,12 +313,20 @@
 							</td>
 							<td class="px-4 py-3 text-right">
 								<div class="flex items-center justify-end gap-1">
-									<button
-										onclick={() => handleResume(entry)}
-										disabled={timerRunning}
-										title="Resume timer"
-										class="p-1.5 rounded transition-colors cursor-pointer disabled:cursor-not-allowed {timerRunning ? 'text-text-secondary/30' : 'text-[#22c55e] hover:bg-[#22c55e]/10'}"
-									><Play size={14} /></button>
+									{#if resumeEntryId === entry.id}
+										<button
+											onclick={handleStop}
+											title="Stop timer"
+											class="p-1.5 rounded transition-colors cursor-pointer text-danger hover:bg-danger/10"
+										><Square size={14} /></button>
+									{:else}
+										<button
+											onclick={() => handleResume(entry)}
+											disabled={timerRunning}
+											title="Resume timer"
+											class="p-1.5 rounded transition-colors cursor-pointer disabled:cursor-not-allowed {timerRunning ? 'text-text-secondary/30' : 'text-[#22c55e] hover:bg-[#22c55e]/10'}"
+										><Play size={14} /></button>
+									{/if}
 									<button onclick={() => startEdit(entry)} class="p-1.5 rounded text-text-secondary hover:text-accent hover:bg-accent/10 transition-colors cursor-pointer"><Pencil size={14} /></button>
 									<button onclick={() => handleDelete(entry.id)} class="p-1.5 rounded text-text-secondary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"><Trash2 size={14} /></button>
 								</div>
@@ -299,7 +366,7 @@
 							<input type="text" placeholder="Notes..." bind:value={addNotes} class="w-full bg-bg border border-border rounded px-2 py-1 text-sm text-text placeholder:text-text-secondary/50" />
 						</td>
 						<td class="px-4 py-2">
-							<input type="number" step="0.25" min="0" max="24" placeholder="0.00" bind:value={addHours} class="w-20 bg-bg border border-border rounded px-2 py-1 text-sm text-text text-right font-mono ml-auto block" />
+							<input type="text" placeholder="0:00" bind:value={addHours} class="w-20 bg-bg border border-border rounded px-2 py-1 text-sm text-text text-right font-mono ml-auto block" />
 						</td>
 						<td class="px-4 py-2 text-right">
 							<div class="flex items-center justify-end gap-1">

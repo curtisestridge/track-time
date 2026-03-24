@@ -8,3 +8,13 @@ export function formatHours(decimalHours: number): string {
 	const minutes = totalMinutes % 60;
 	return `${hours}:${String(minutes).padStart(2, '0')}`;
 }
+
+/**
+ * Returns today's date as YYYY-MM-DD in local timezone.
+ */
+export function localDate(date: Date = new Date()): string {
+	const y = date.getFullYear();
+	const m = String(date.getMonth() + 1).padStart(2, '0');
+	const d = String(date.getDate()).padStart(2, '0');
+	return `${y}-${m}-${d}`;
+}
