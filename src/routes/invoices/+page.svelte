@@ -21,7 +21,7 @@
 	let invoiceNotes = $state('');
 	let rangeStart = $state('');
 	let rangeEnd = $state('');
-	let lineItems: { description: string; hours: number; rate: number; amount: number }[] = $state([]);
+	let lineItems: { description: string; hours: number; rate: number; amount: number; selected: boolean }[] = $state([]);
 	let entriesLoaded = $state(false);
 
 	// Manual line item
@@ -41,6 +41,16 @@
 		rangeEnd = '';
 		calculateDueDate();
 	}
+
+	$effect(() => {
+		if (showCreate && selectedClientId) {
+			const now = new Date();
+			const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, now.getDate());
+			rangeStart = localDate(threeMonthsAgo);
+			rangeEnd = localDate(now);
+			loadTimeEntries();
+		}
+	});
 
 	function calculateDueDate() {
 		const terms = settings.payment_terms || 'Net 30';
@@ -81,7 +91,8 @@
 			description: g.description,
 			hours: Math.round(g.hours * 100) / 100,
 			rate,
-			amount: Math.round(g.hours * rate * 100) / 100
+			amount: Math.round(g.hours * rate * 100) / 100,
+			selected: true
 		}));
 		entriesLoaded = true;
 	}
@@ -103,17 +114,26 @@
 			description: manualDesc,
 			hours: h,
 			rate: r,
-			amount: Math.round(h * r * 100) / 100
+			amount: Math.round(h * r * 100) / 100,
+			selected: true
 		}];
 		manualDesc = '';
 		manualHours = '';
 		manualRate = '';
 	}
 
-	let total = $derived(lineItems.reduce((sum, item) => sum + item.amount, 0));
+	let allSelected = $derived(lineItems.length > 0 && lineItems.every(item => item.selected));
+
+	function toggleSelectAll() {
+		const newVal = !allSelected;
+		lineItems.forEach(item => item.selected = newVal);
+	}
+
+	let selectedItems = $derived(lineItems.filter(item => item.selected));
+	let total = $derived(selectedItems.reduce((sum, item) => sum + item.amount, 0));
 
 	async function createInvoice() {
-		if (!selectedClientId || lineItems.length === 0) return;
+		if (!selectedClientId || selectedItems.length === 0) return;
 
 		const res = await fetch('/api/invoices', {
 			method: 'POST',
@@ -124,7 +144,7 @@
 				due_date: dueDate,
 				notes: invoiceNotes || null,
 				payment_instructions: paymentInstructions || null,
-				line_items: lineItems
+				line_items: selectedItems
 			})
 		});
 
@@ -260,16 +280,21 @@
 					<table class="w-full mb-4">
 						<thead>
 							<tr class="border-b border-border text-left text-xs text-text-secondary uppercase tracking-wider">
+								<th class="pb-2 w-10">
+									<input type="checkbox" checked={allSelected} onchange={toggleSelectAll} class="cursor-pointer accent-accent" />
+								</th>
 								<th class="pb-2 font-medium">Description</th>
 								<th class="pb-2 font-medium text-right w-20">Hours</th>
 								<th class="pb-2 font-medium text-right w-32">Rate ({currency}/hr)</th>
 								<th class="pb-2 font-medium text-right w-28">Amount</th>
-								<th class="pb-2 w-10"></th>
 							</tr>
 						</thead>
 						<tbody>
 							{#each lineItems as item, i}
-								<tr class="border-b border-border/50">
+								<tr class="border-b border-border/50 {item.selected ? '' : 'opacity-40'}">
+									<td class="py-2">
+										<input type="checkbox" bind:checked={item.selected} class="cursor-pointer accent-accent" />
+									</td>
 									<td class="py-2 text-sm">{item.description}</td>
 									<td class="py-2 text-sm text-right font-mono">{item.hours.toFixed(2)}</td>
 									<td class="py-2 text-right">
@@ -283,11 +308,6 @@
 										/>
 									</td>
 									<td class="py-2 text-sm text-right font-mono font-medium">{formatCurrency(item.amount)}</td>
-									<td class="py-2 text-right">
-										<button onclick={() => removeItem(i)} class="p-1 rounded text-text-secondary hover:text-danger transition-colors cursor-pointer">
-											<X size={14} />
-										</button>
-									</td>
 								</tr>
 							{/each}
 						</tbody>
@@ -326,7 +346,7 @@
 
 			<button
 				onclick={createInvoice}
-				disabled={!selectedClientId || lineItems.length === 0}
+				disabled={!selectedClientId || selectedItems.length === 0}
 				class="bg-accent hover:bg-accent-hover text-white rounded-md px-6 py-2.5 text-sm font-medium transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
 			>
 				Create Invoice
